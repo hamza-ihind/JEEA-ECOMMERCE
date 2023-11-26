@@ -6,7 +6,7 @@ const clerk = new Clerk({
 
 const clerkMiddleware = async (req, res, next) => {
   try {
-    const session = await clerk.getSession({ req });
+    const session = await clerk.getSession(req);
 
     if (session) {
       req.clerkUser = session.user;
