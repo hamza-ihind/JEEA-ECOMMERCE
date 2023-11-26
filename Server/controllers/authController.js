@@ -1,56 +1,55 @@
 const asyncHandler = require('express-async-handler');
-const USER = require('../models/userModel');
+const { Clerk } = require('@clerk/clerk-sdk-node');
 const GenerateToken = require('../config/GenerateToken');
-const { VALIDATION_ERROR, UNAUTHORIZED } = require('../utils/constants');
+const { UNAUTHORIZED } = require('../utils/constants');
 
-//_________ SignIn : 
-const SignIn = asyncHandler(async (req, res, next) => {
-    const { email, password } = req.body;
-    if (!email || !password) {
-      res.status(VALIDATION_ERROR);
-      throw new Error("Email and password are required for sign in");
-    }
-    const user = await USER.findOne({ email });
-    if (!user || !(await user.matchPassword(password))) {
-      res.status(UNAUTHORIZED);
-      throw new Error("Invalid email or password");
-    }
-    res.status(200).json({
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      token: GenerateToken(user._id),
-    });
+const clerk = new Clerk({
+  apiKey: process.env.CLERK_SECRET_KEY,
 });
 
-//_________ Signup :
-const SignUp = asyncHandler(async (req, res, next) => {
-  const { name, email, password } = req.body;
-  if (!name || !email || !password) {
-    res.status(VALIDATION_ERROR);
-    throw new Error("All fields are required");
-  }
-  const userExists = await USER.findOne({ email });
-  if (userExists) {
-    throw new Error("User already exists");
-  }
-  
-  const user = await USER.create({ name, email, password });
+// Sign In
+const SignIn = asyncHandler(async (req, res) => {
+  try {
+    const session = await clerk.getSession(req);
 
-  if (user) {
-    res.status(201).json({
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      token: GenerateToken(user._id),
-    });
-  } else {
-    res.status(UNAUTHORIZED);
-    throw new Error("Failed to create user");
+    if (session) {
+      console.log('Sign-in successful:', session.user);
+      res.status(200).json({
+        _id: session.user.id,
+        email: session.user.email,
+        token: GenerateToken(session.user.id),
+      });
+    } else {
+      res.status(UNAUTHORIZED).json({ error: 'No active session' });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-module.exports ={
-  SignUp, 
+// Sign Up
+const SignUp = asyncHandler(async (req, res) => {
+  try {
+    const session = await clerk.getSession(req);
+
+    if (session) {
+      console.log('Sign-up successful:', session.user);
+      res.status(201).json({
+        _id: session.user.id,
+        email: session.user.email,
+        token: GenerateToken(session.user.id),
+      });
+    } else {
+      res.status(UNAUTHORIZED).json({ error: 'No active session' });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+module.exports = {
+  SignUp,
   SignIn,
 };
